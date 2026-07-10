@@ -27,7 +27,7 @@ Run `python stretch_critic_subagent.py`. This adds a fifth agent whose only job 
 **Why this lands:** Demonstrates an adversarial review pattern inside the swarm. Maps directly to how real services firms run a partner review.
 
 ### S3. Memory across deals
-Wire up the [Memory tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool) to the coordinator. Run two consecutive deals from different fictional customers. The second deal should reference what the coordinator learned from the first ("we typically win these on TCO, not headline price — Acme last quarter…").
+Attach a [memory store](https://platform.claude.com/docs/en/managed-agents/memory) to the coordinator's session so what it learns persists across runs. Run two consecutive deals from different fictional customers. The second deal should reference what the coordinator learned from the first ("we typically win these on TCO, not headline price — Acme last quarter…").
 
 **Why this lands:** Now the swarm gets better over time, not just on this one deal.
 
@@ -62,7 +62,7 @@ Add the [pptx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-
 ## Tier 4 — For the showoffs
 
 ### S8. The escalation pattern
-Add a "Strategic Pricing" sub-agent that uses claude-opus-4-7. The Pricing Specialist (which uses Sonnet) should delegate to Strategic Pricing only when the deal exceeds $500K. Demonstrates the "escalation" multi-agent pattern from the docs.
+Add a "Strategic Pricing" sub-agent that uses claude-opus-4-8. The Pricing Specialist (which uses Sonnet) should delegate to Strategic Pricing only when the deal exceeds $500K. Demonstrates the "escalation" multi-agent pattern from the docs.
 
 ### S9. The voting pattern
 For the contentious calls (e.g., "should we accept the MFN clause?"), spawn three parallel copies of the Legal Reviewer, each with a slightly different system prompt (conservative / balanced / aggressive). Have the coordinator synthesise their three opinions.
@@ -73,6 +73,31 @@ For the contentious calls (e.g., "should we accept the MFN clause?"), spawn thre
 After producing the docx, have the coordinator generate a question for itself: "What's the riskiest assumption in this proposal?" Spawn a new session to investigate that question. Loop until the coordinator says "stop."
 
 This is genuine autonomous agentic work. Don't run it in a paid workspace without spend caps.
+
+### S11. Define the outcome
+This one is text-only, and it's the newest thing on the platform. Instead of sending the swarm a kickoff *message*, send it a defined **outcome** — a rubric — and let a grader iterate the swarm against it until it passes. In `run_deal_desk.py`, swap the kickoff event:
+
+```python
+# Replace the kickoff user.message with a defined outcome:
+RUBRIC = (
+    "proposal-response.docx exists in /mnt/session/outputs/, covers all six "
+    "proposal sections (exec summary, understanding, fit, commercial, "
+    "contract approach, risks), and cites at least two past wins by name."
+)
+kickoff_events = [{
+    "type": "user.define_outcome",
+    "description": user_message,                  # the brief you'd normally send
+    "rubric": {"type": "text", "content": RUBRIC},
+    "max_iterations": 3,
+}]
+# then in on_event, surface the grader's passes as they stream:
+#   if event.type.startswith("span.outcome_evaluation"):
+#       print(f"  [grader] {event.type}")
+```
+
+Watch the `span.outcome_evaluation_*` events flow past on the stream — that's the grader checking the deliverable against your rubric and sending the swarm back to fix what's missing, up to `max_iterations` times.
+
+**Why this lands:** the swarm now grades its own deliverable and reworks it until it passes — no human in the loop deciding "good enough." It's the newest Managed Agents capability (Outcomes), and it turns "run the agents" into "hit this bar."
 
 ---
 

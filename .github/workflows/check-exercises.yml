@@ -1,0 +1,17 @@
+name: Check exercises
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # 3.9 = the floor we support: stock macOS python3 on participant laptops.
+          # py_compile in the checker enforces that every exercise parses there.
+          python-version: "3.9"
+      - run: python tools/check_exercises.py

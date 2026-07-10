@@ -1,89 +1,71 @@
 # Track 3 — Specialist Swarm
 
-**Concept landed:** Skills, sub-agents & orchestration
-**Tech:** [Claude Managed Agents multi-agent](https://platform.claude.com/docs/en/managed-agents/multi-agent) + [custom Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) + the pre-built [docx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart)
-**Build window:** ~40 minutes on the clock
-**Output:** A coordinator agent that fans work out to specialist sub-agents, each with its own skill, assembling a real branded Word document.
+You build a **coordinator agent** that fans an inbound RFP out to four **specialist sub-agents** — each carrying its own **skill** — and synthesises their work into a real branded Word document. It's the coordinator-plus-specialists shape every services firm runs on, made concrete: drop an RFP in, watch four specialists answer in parallel on the events stream, get `proposal-response.docx` out.
 
-## The pitch
+**Start with [`BRIEF.md`](./BRIEF.md)** — the scenario, the numbered build, the 40-minute plan, and the demo.
 
-This is the architecture that wins the next $50M transformation deal: **coordinator + specialists + skills**. It maps directly to how every services firm structures real work. A senior partner orchestrates; specialists (legal, pricing, technical) own their lanes; the senior partner synthesises and delivers.
-
-You're going to build exactly that around a Deal Desk scenario. Drop an RFP in, get a branded response doc out, and watch the parallelism happen live on the events stream.
-
-Two working agents beat five broken ones — get the coordinator and one specialist handing off cleanly before you scale the roster.
-
-## Setup (5 min)
-
-You need a workspace API key from the Console. **Multi-agent is a research preview — confirm with your facilitator that your team's workspace has access before you start** (this is checked in the preflight; if it wasn't, wave someone over now, not at minute 30).
+## Step 0 — run this first
 
 ```bash
-git clone https://github.com/victorsteeb/agent-build-specialist-swarm.git
-cd agent-build-specialist-swarm
-pip install -r requirements.txt
-export ANTHROPIC_API_KEY="sk-ant-..."
+python check_setup.py
 ```
 
-## Pick a scenario card
+It verifies your dependencies, API key, SDK version, **whether your workspace has multi-agent access** (a research preview this track needs), and any saved state from earlier runs. Green across the board means you're clear to build. If it flags something, it prints the fix — and [`TROUBLESHOOTING.md`](./TROUBLESHOOTING.md) has the details, including a manual fallback if multi-agent access isn't granted.
 
-Three cards in [`scenario-cards.md`](./scenario-cards.md). Card A (Deal Desk) is fully wired in the starter data; B and C need you to extend `synthetic-data/`. Different teams should pick different cards.
+Key setup, venvs, and corporate proxies → [`SETUP.md`](./SETUP.md).
 
-## Core build — run in THIS order
+## How to run
 
-The order matters: the coordinator pins its specialists' versions when it is created, so **skills must be attached to the specialists before the coordinator exists**. Coordinator-before-skills means your specialists silently run without their skills.
+Work the exercise in the repo — run the scripts, don't paste code out of a chat window. The build is five scripts in a fixed order (`BRIEF.md` has the details); each one is safe to re-run.
 
-1. **Create the environment.** `python setup_environment.py` — the cloud container sessions run in. Safe to re-run; reuses an existing environment by name.
+### VS Code / Cursor (recommended)
+1. **File → Open Folder** and select this folder.
+2. Install the **Python** extension if prompted, and set up a virtual environment (see `SETUP.md`).
+3. In the integrated terminal: `python check_setup.py`, then run the five build scripts in order.
 
-2. **Create the specialists.** `python create_specialists.py` — four sub-agents (Pricing, Legal, Technical Fit, Competitive), IDs saved to `.specialist_ids.json`.
+### Claude Code (CLI)
+`cd` into this folder and either run the scripts yourself or pair with Claude Code to drive and debug them — it reads [`CLAUDE.md`](./CLAUDE.md) for how to help.
 
-3. **Upload and attach the skills.** `python upload_skills.py` — packages each folder in `skills/` via the Skills API and attaches it to the matching specialist. Idempotent on re-run.
+```bash
+cd agent-build-specialist-swarm
+python check_setup.py
+claude                      # …or work the exercise with Claude Code as your pair
+```
 
-4. **Create the coordinator.** `python create_coordinator.py` — the Senior Partner agent, with the four specialists in its `multiagent` roster and the pre-built **docx skill** attached (that's what turns the synthesis into a real Word document).
-
-5. **Run the deal.** `python run_deal_desk.py` — uploads the synthetic RFP, streams the events so you can watch the parallel thread fan-out, and downloads everything the swarm saved to `/mnt/session/outputs/` into `outputs/`.
-
-By the end you have `outputs/proposal-response.docx`, generated by a coordinator + specialists who each used their own skill.
-
-**One deliverable rule to remember if you modify the prompts:** agents can only hand files back to you from `/mnt/session/outputs/` inside the container. A deliverable written anywhere else is unreachable after the session.
-
-## Stretch goals
-
-See [`stretch-goals.md`](./stretch-goals.md). The big ones:
-
-- **Custom firm-voice skill** — codify your own firm's voice (every services firm has one)
-- **Critic sub-agent** — a fifth agent that reviews the coordinator's draft before it ships
-- **Memory across deals** — the coordinator remembers past wins and re-uses the right ones
-- **Synthetic MCP for past wins** — wire a fake CRM to the pricing specialist
-
-## Two-minute demo
-
-Two-monitor setup:
-- **Monitor 1:** the events stream from the coordinator session, scrolling. You'll see `session.thread_created` × 4, parallel `running`, then `agent.thread_message_received` flowing back. The visible parallelism IS the demo.
-- **Monitor 2:** `outputs/proposal-response.docx`, open. Real document, branded, ready to send.
-
-Narrate the events stream while it runs. The room will get it.
+### Claude Desktop
+Keep it open alongside as your AI pair — ask it to explain an event, debug an error, or suggest the next prompt change while you edit.
 
 ## What's in this folder
 
 ```
 agent-build-specialist-swarm/
-├── README.md
-├── scenario-cards.md
-├── stretch-goals.md
+├── README.md                       (you are here)
+├── BRIEF.md                        (the exercise — read this first)
+├── TROUBLESHOOTING.md              (failure catalog + fixes)
+├── CLAUDE.md                       (coaching notes for Claude Code)
+├── SETUP.md                        (key, venv, proxy, no-admin)
+├── stretch-goals.md                (push-further menu)
 ├── requirements.txt
-├── setup_environment.py           (step 1 — cloud environment, get-or-create)
-├── create_specialists.py          (step 2 — the four sub-agents)
-├── upload_skills.py               (step 3 — Skills API upload + attach)
-├── create_coordinator.py          (step 4 — Senior Partner + roster + docx skill)
-├── run_deal_desk.py               (step 5 — run the swarm, stream, download)
-├── download_deliverable.py        (re-fetch outputs from any past session)
-├── stretch_critic_subagent.py     (stretch: critic agent)
-├── skills/                        (custom skills, one per specialist)
+├── check_setup.py                  (step 0 — verify key, SDK, multi-agent access, saved state)
+├── _common.py                      (shared helpers: key loading, client, session driver)
+├── setup_environment.py            (step 1 — cloud environment, get-or-create)
+├── create_specialists.py           (step 2 — the four sub-agents, idempotent)
+├── upload_skills.py                (step 3 — Skills API upload + attach, idempotent)
+├── create_coordinator.py           (step 4 — Senior Partner + roster + docx skill; re-run to re-pin)
+├── run_deal_desk.py                (step 5 — run the swarm, stream events, download outputs)
+├── download_deliverable.py         (re-fetch outputs from any past session)
+├── stretch_critic_subagent.py      (stretch: a critic agent that reviews the draft)
+├── skills/                         (custom skills — one per specialist)
 │   ├── pricing-playbook/SKILL.md
 │   ├── legal-checklist/SKILL.md
+│   ├── technical-fit/SKILL.md
 │   └── competitive-intel/SKILL.md
 └── synthetic-data/
-    ├── rfp-acme-corp.md           (the RFP that triggers the swarm)
-    ├── past-wins.json             (used by pricing specialist)
-    └── product-overview.md        (used by technical specialist)
+    ├── rfp-acme-corp.md            (the RFP that triggers the swarm)
+    ├── past-wins.json              (inlined into the kickoff; the Pricing specialist cites it)
+    └── product-overview.md         (the source the technical-fit skill was built from)
 ```
+
+## Rules of the data
+
+All fictional. Acme Corp, the past wins, the competitor battlecards, the product capabilities — none of it maps to anything real. Don't add real customer or firm data to your checkout.
