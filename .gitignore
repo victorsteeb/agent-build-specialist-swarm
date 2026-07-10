@@ -1,0 +1,13 @@
+# runtime state written by the scripts — never commit
+.agent_id
+.environment_id
+.memory_store_id
+.curator_agent_id
+.specialist_ids.json
+.skill_ids.json
+.coordinator_id
+.last_session_id
+outputs/
+.env
+.venv/
+__pycache__/
