@@ -11,3 +11,4 @@ outputs/
 .env
 .venv/
 __pycache__/
+.skill_title_suffix

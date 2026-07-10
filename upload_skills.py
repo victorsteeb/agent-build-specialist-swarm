@@ -12,9 +12,10 @@ Usage:
 
 import json
 import os
+import secrets
 from pathlib import Path
 
-from anthropic import Anthropic
+from anthropic import Anthropic, BadRequestError
 from anthropic.lib import files_from_dir
 
 
@@ -37,13 +38,21 @@ def main() -> None:
 
     client = Anthropic()
 
-    # List existing custom skills so we can detect and reuse any prior uploads.
-    # Skills API enforces unique display_title, so retrying with the same title
-    # would otherwise fail. Idempotent retry is essential for hackathon dev loops.
-    print("Checking for existing skills...")
+    # Skill display_titles must be globally unique — including titles you can't
+    # see in your own workspace's list (other teams, deleted skills). So bare
+    # titles like "Pricing Playbook" collide in shared orgs. Each checkout gets
+    # a stable random suffix: unique across teams, reusable across re-runs.
+    suffix_path = Path(".skill_title_suffix")
+    if suffix_path.exists():
+        suffix = suffix_path.read_text().strip()
+    else:
+        suffix = secrets.token_hex(3)
+        suffix_path.write_text(suffix)
+
+    print(f"Checking for existing skills (title suffix: {suffix})...")
     existing_by_title: dict[str, str] = {}
-    for page in client.beta.skills.list(source="custom"):
-        existing_by_title[page.display_title] = page.id
+    for item in client.beta.skills.list(source="custom"):
+        existing_by_title[item.display_title] = item.id
 
     uploaded: dict[str, str] = {}
 
@@ -53,7 +62,7 @@ def main() -> None:
             print(f"  Skipping {skill_name} — no SKILL.md found")
             continue
 
-        display_title = skill_name.replace("-", " ").title()
+        display_title = f"{skill_name.replace('-', ' ').title()} {suffix}"
 
         # 1. Upload the skill (or reuse if one already exists with this title)
         if display_title in existing_by_title:
@@ -62,10 +71,23 @@ def main() -> None:
             uploaded[skill_name] = skill_id
         else:
             print(f"Uploading skill: {skill_name}...")
-            skill = client.beta.skills.create(
-                display_title=display_title,
-                files=files_from_dir(str(skill_dir)),
-            )
+            try:
+                skill = client.beta.skills.create(
+                    display_title=display_title,
+                    files=files_from_dir(str(skill_dir)),
+                )
+            except BadRequestError as e:
+                if "display_title" not in str(e):
+                    raise
+                # Title collides with a skill we can't see. New suffix, one retry.
+                suffix = secrets.token_hex(3)
+                suffix_path.write_text(suffix)
+                display_title = f"{skill_name.replace('-', ' ').title()} {suffix}"
+                print(f"  title collision — retrying with suffix {suffix}")
+                skill = client.beta.skills.create(
+                    display_title=display_title,
+                    files=files_from_dir(str(skill_dir)),
+                )
             uploaded[skill_name] = skill.id
             print(f"  -> {skill.id}")
 
@@ -78,7 +100,7 @@ def main() -> None:
 
         # Avoid duplicate attachment on re-run. The SDK returns skill entries
         # as typed objects (dicts only on some versions) — handle both.
-        def _skill_id_of(entry) -> str | None:
+        def _skill_id_of(entry):
             if isinstance(entry, dict):
                 return entry.get("skill_id")
             return getattr(entry, "skill_id", None)
