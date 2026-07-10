@@ -7,16 +7,12 @@ Usage:
     python setup_environment.py
 """
 
-import os
 from pathlib import Path
 
-from anthropic import Anthropic
+from _common import get_client
 
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
-
     env_path = Path(".environment_id")
     if env_path.exists():
         existing = env_path.read_text().strip()
@@ -24,7 +20,7 @@ def main() -> None:
         print("(remove .environment_id if you want to provision a new one)")
         return
 
-    client = Anthropic()
+    client = get_client()
 
     # Environment names are unique per workspace — a second create with the
     # same name returns 409. On a shared team workspace (or after deleting

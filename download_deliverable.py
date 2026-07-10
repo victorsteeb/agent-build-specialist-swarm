@@ -13,8 +13,7 @@ Usage:
 import sys
 from pathlib import Path
 
-from anthropic import Anthropic
-
+from _common import console_url, get_client
 
 OUTPUT_DIR = Path("outputs")
 
@@ -32,29 +31,35 @@ def main() -> None:
             )
         session_id = last.read_text().strip()
 
-    client = Anthropic()
+    client = get_client()
 
     print(f"Listing files for session {session_id}...")
     # `scope_id` filters to files the session wrote to /mnt/session/outputs/.
     # Iterating the result auto-paginates.
     OUTPUT_DIR.mkdir(exist_ok=True)
     count = 0
-    for f in client.beta.files.list(
-        scope_id=session_id,
-        betas=["managed-agents-2026-04-01"],
-    ):
-        out_path = OUTPUT_DIR / f.filename
-        print(f"  downloading {f.filename} ({f.id})")
-        content = client.beta.files.download(f.id)
-        content.write_to_file(str(out_path))
-        print(f"    -> {out_path}")
-        count += 1
+    try:
+        for f in client.beta.files.list(
+            scope_id=session_id,
+            betas=["managed-agents-2026-04-01"],
+        ):
+            out_path = OUTPUT_DIR / f.filename
+            print(f"  downloading {f.filename} ({f.id})")
+            content = client.beta.files.download(f.id)
+            content.write_to_file(str(out_path))
+            print(f"    -> {out_path}")
+            count += 1
+    except Exception as e:
+        raise SystemExit(
+            f"Could not list files for that session ({type(e).__name__}: {e}).\n"
+            "Is the session ID right, and does it belong to this key's workspace?\n"
+            f"Check the session: {console_url(session_id)}"
+        )
 
     if count == 0:
         print("\nNo files found on that session.")
         print("(Deliverables must be saved under /mnt/session/outputs/ in the container.)")
-        print("Check the session in the Console:")
-        print(f"  https://platform.claude.com/workspaces/default/sessions/{session_id}")
+        print(f"Check the session in the Console:\n  {console_url(session_id)}")
     else:
         print(f"\nDownloaded {count} file(s) to {OUTPUT_DIR}/")
 

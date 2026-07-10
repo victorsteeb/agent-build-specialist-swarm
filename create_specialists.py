@@ -7,25 +7,26 @@ Each specialist gets:
 - A skill that matches its domain (uploaded separately by upload_skills.py)
 
 Saves the resulting agent IDs to .specialist_ids.json so create_coordinator.py
-can reference them.
+can reference them. Safe to re-run: existing specialists are validated and
+reused, never duplicated.
 
 Usage:
-    export ANTHROPIC_API_KEY="sk-ant-..."
     python create_specialists.py
 """
 
 import json
-import os
 from pathlib import Path
 
-from anthropic import Anthropic
+import anthropic
+
+from _common import get_client
 
 
 SPECIALISTS = [
     {
         "key": "pricing",
         "name": "Pricing Specialist",
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-5",
         "system": (
             "You are the Pricing Specialist in a Deal Desk. Your job is to "
             "recommend commercial terms for inbound RFPs.\n\n"
@@ -44,7 +45,7 @@ SPECIALISTS = [
     {
         "key": "legal",
         "name": "Legal Reviewer",
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-5",
         "system": (
             "You are the Legal Reviewer in a Deal Desk. Your job is to read "
             "an RFP and flag every clause that conflicts with our standard "
@@ -64,13 +65,13 @@ SPECIALISTS = [
     {
         "key": "technical_fit",
         "name": "Technical Fit Specialist",
-        "model": "claude-sonnet-4-6",
+        "model": "claude-sonnet-5",
         "system": (
             "You are the Technical Fit Specialist. You decide whether our "
             "product actually does what the RFP asks for.\n\n"
             "Inputs:\n"
             "- The RFP text\n"
-            "- product-overview.md (the canonical capability map)\n\n"
+            "- The technical-fit skill (the canonical capability map)\n\n"
             "Output: a structured fit assessment:\n"
             "1. Requirements we meet fully\n"
             "2. Requirements we meet partially (and what's missing)\n"
@@ -82,7 +83,7 @@ SPECIALISTS = [
     {
         "key": "competitive",
         "name": "Competitive Intel Analyst",
-        "model": "claude-haiku-4-5-20251001",  # Cheaper for a quick analyst lookup
+        "model": "claude-haiku-4-5",  # Cheaper for a quick analyst lookup; alias, never date-pinned
         "system": (
             "You are the Competitive Intel Analyst. You identify who else "
             "is likely competing for this RFP and how we should position.\n\n"
@@ -100,17 +101,28 @@ SPECIALISTS = [
 
 
 def main() -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    client = get_client()
 
-    client = Anthropic(
-        api_key=api_key,
-        default_headers={"anthropic-beta": "managed-agents-2026-04-01"},
-    )
+    # Reuse specialists from an earlier run when their IDs still resolve —
+    # agents are persistent resources; re-creating them on every run litters
+    # the workspace with duplicates and breaks the coordinator's version pins.
+    saved: dict = {}
+    ids_path = Path(".specialist_ids.json")
+    if ids_path.exists():
+        saved = json.loads(ids_path.read_text())
 
-    specialist_ids: dict[str, str] = {}
+    specialist_ids: dict = {}
     for spec in SPECIALISTS:
+        existing = saved.get(spec["key"])
+        if existing:
+            try:
+                client.beta.agents.retrieve(existing)
+                specialist_ids[spec["key"]] = existing
+                print(f"  Reusing {spec['name']:32s} -> {existing}")
+                continue
+            except anthropic.APIStatusError:
+                print(f"  Saved ID for {spec['key']} is unreachable — creating a fresh one.")
+
         agent = client.beta.agents.create(
             name=spec["name"],
             model=spec["model"],
@@ -125,9 +137,15 @@ def main() -> None:
         specialist_ids[spec["key"]] = agent.id
         print(f"  Created {spec['name']:32s} -> {agent.id}")
 
-    Path(".specialist_ids.json").write_text(json.dumps(specialist_ids, indent=2))
+    # Preserve extra keys an earlier run may have added (e.g. the stretch critic)
+    for k, v in saved.items():
+        specialist_ids.setdefault(k, v)
+
+    ids_path.write_text(json.dumps(specialist_ids, indent=2))
     print(f"\nSaved {len(specialist_ids)} specialist IDs to .specialist_ids.json")
     print("Next: python upload_skills.py")
+    print("(changed a specialist after the coordinator exists? re-run "
+          "create_coordinator.py afterwards — it re-pins the roster)")
 
 
 if __name__ == "__main__":

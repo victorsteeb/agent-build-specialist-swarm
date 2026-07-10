@@ -11,32 +11,32 @@ Usage:
 """
 
 import json
-import os
 import secrets
 from pathlib import Path
 
-from anthropic import Anthropic, BadRequestError
+from anthropic import BadRequestError
 from anthropic.lib import files_from_dir
 
+from _common import get_client
 
-# Map skill directory name → specialist key that should get it
+
+# Map skill directory name → specialist key that should get it.
+# One skill per specialist — that symmetry is the architecture story.
 SKILL_TO_SPECIALIST = {
-    "pricing-playbook": "pricing",
-    "legal-checklist":  "legal",
+    "pricing-playbook":  "pricing",
+    "legal-checklist":   "legal",
+    "technical-fit":     "technical_fit",
     "competitive-intel": "competitive",
 }
 
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
-
     specialist_ids_path = Path(".specialist_ids.json")
     if not specialist_ids_path.exists():
         raise SystemExit("Run create_specialists.py first.")
     specialist_ids = json.loads(specialist_ids_path.read_text())
 
-    client = Anthropic()
+    client = get_client()
 
     # Skill display_titles must be globally unique — including titles you can't
     # see in your own workspace's list (other teams, deleted skills). So bare

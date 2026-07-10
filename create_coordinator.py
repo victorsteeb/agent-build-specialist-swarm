@@ -7,15 +7,20 @@ synthesise their outputs into the final deliverable.
 
 Saves the coordinator's ID to .coordinator_id.
 
+Safe to re-run — and you SHOULD re-run it whenever you change the specialists
+(new skills attached, new specialist added): the roster pins each specialist's
+version at save time, so this script is how the coordinator picks up changes.
+
 Usage:
     python create_coordinator.py
 """
 
 import json
-import os
 from pathlib import Path
 
-from anthropic import Anthropic
+import anthropic
+
+from _common import get_client
 
 
 COORDINATOR_SYSTEM = """\
@@ -57,9 +62,15 @@ You can call these specialists:
 
 # How to talk to specialists
 
+Specialists do NOT see your conversation or your files. When delegating,
+include everything the specialist needs inside your message: every
+specialist gets the full RFP text, and the Pricing Specialist also gets
+the full contents of past-wins.json. Never say "see the attached" or
+"refer to the data" — paste it.
+
 When delegating, be direct: "Pricing Specialist: for this RFP, recommend
-terms. Include discount band and red-line concessions. Cite past-wins.json
-where relevant."
+terms. Include discount band and red-line concessions. Cite the past-wins
+data where relevant."
 
 When you receive a specialist's reply, accept it. Don't second-guess. If
 you genuinely disagree, send the specialist a follow-up — but only if it
@@ -68,49 +79,62 @@ matters.
 # Tone
 
 Senior partner running a real deal. Confident, terse, decisive. You move
-fast because the RFP deadline is real.
+fast because the RFP deadline is real. You are operating autonomously: do
+not pause to ask permission or offer options mid-deal — run the process
+end-to-end and deliver.
 """
 
 
 def main() -> None:
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    client = get_client()
 
     specialist_ids_path = Path(".specialist_ids.json")
     if not specialist_ids_path.exists():
         raise SystemExit("Run create_specialists.py first.")
     specialist_ids = json.loads(specialist_ids_path.read_text())
 
-    client = Anthropic(
-        api_key=api_key,
-        default_headers={"anthropic-beta": "managed-agents-2026-04-01"},
-    )
-
-    coordinator = client.beta.agents.create(
-        name="Deal Desk Senior Partner",
-        model="claude-opus-4-7",  # Coordinator deserves the most capable model
+    roster = [
+        {"type": "agent", "id": agent_id} for agent_id in specialist_ids.values()
+    ]
+    config = dict(
+        model="claude-opus-4-8",  # Coordinator deserves the most capable model
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
         # The docx skill is what turns the synthesis into a real Word document.
         # Without it the coordinator falls back to markdown-in-chat.
         skills=[{"type": "anthropic", "skill_id": "docx"}],
-        multiagent={
-            "type": "coordinator",
-            "agents": [
-                {"type": "agent", "id": agent_id}
-                for agent_id in specialist_ids.values()
-            ],
-        },
-        metadata={
-            "hackathon": "partner-basecamp-2026",
-            "track": "specialist-swarm",
-            "role": "coordinator",
-        },
+        multiagent={"type": "coordinator", "agents": roster},
     )
 
-    Path(".coordinator_id").write_text(coordinator.id)
-    print(f"Coordinator created: {coordinator.id}")
+    # The roster pins each specialist's CURRENT version. Re-running this script
+    # after changing specialists updates the coordinator in place (new version)
+    # instead of creating a duplicate.
+    coord_path = Path(".coordinator_id")
+    if coord_path.exists():
+        coordinator_id = coord_path.read_text().strip()
+        try:
+            current = client.beta.agents.retrieve(coordinator_id)
+        except anthropic.APIStatusError:
+            raise SystemExit(
+                f"Saved .coordinator_id ({coordinator_id[:18]}…) is unreachable with "
+                "this key. Delete .coordinator_id and re-run, or run "
+                "`python check_setup.py` to validate all saved state."
+            )
+        client.beta.agents.update(coordinator_id, version=current.version, **config)
+        print(f"Coordinator updated (re-pinned roster): {coordinator_id}")
+    else:
+        coordinator = client.beta.agents.create(
+            name="Deal Desk Senior Partner",
+            metadata={
+                "hackathon": "partner-basecamp-2026",
+                "track": "specialist-swarm",
+                "role": "coordinator",
+            },
+            **config,
+        )
+        coord_path.write_text(coordinator.id)
+        print(f"Coordinator created: {coordinator.id}")
+
     print(f"Roster: {list(specialist_ids.keys())}")
     print(f"\nNext: python run_deal_desk.py")
 

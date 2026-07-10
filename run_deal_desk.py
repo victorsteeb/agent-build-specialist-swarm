@@ -11,17 +11,16 @@ Usage:
     python run_deal_desk.py
 """
 
-import os
 import time
 from pathlib import Path
 
-from anthropic import Anthropic
-
+from _common import create_session_or_explain, drive_session, get_client, read_id
 
 RFP_PATH = Path("synthetic-data/rfp-acme-corp.md")
+# product-overview.md is no longer inlined — it ships to the Technical Fit
+# specialist as the technical-fit skill (see skills/technical-fit/).
 SUPPORTING_FILES = [
     Path("synthetic-data/past-wins.json"),
-    Path("synthetic-data/product-overview.md"),
 ]
 OUTPUT_DIR = Path("outputs")
 
@@ -38,26 +37,22 @@ def load_inputs_as_context() -> str:
 
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("Set ANTHROPIC_API_KEY before running.")
+    client = get_client()
 
-    if not Path(".coordinator_id").exists() or not Path(".environment_id").exists():
-        raise SystemExit(
-            "Missing .coordinator_id or .environment_id. Run, in order: "
-            "setup_environment.py, create_specialists.py, upload_skills.py, "
-            "create_coordinator.py."
-        )
-
-    coordinator_id = Path(".coordinator_id").read_text().strip()
-    environment_id = Path(".environment_id").read_text().strip()
-
-    client = Anthropic()
+    order_hint = (
+        "Run, in order: setup_environment.py, create_specialists.py, "
+        "upload_skills.py, create_coordinator.py."
+    )
+    coordinator_id = read_id(".coordinator_id", order_hint)
+    environment_id = read_id(".environment_id", order_hint)
 
     print("Loading RFP + supporting docs...")
     context = load_inputs_as_context()
 
     print(f"\nStarting session against coordinator {coordinator_id}...")
-    session = client.beta.sessions.create(
+    session = create_session_or_explain(
+        client,
+        [".coordinator_id", ".environment_id"],
         agent=coordinator_id,
         environment_id=environment_id,
         title="Deal Desk — Acme Corp RFP",
@@ -80,39 +75,39 @@ def main() -> None:
 
     # Stream the events — this is the demo. Watch for parallel thread spawns.
     print("\n=== EVENT STREAM (this is the demo) ===\n")
-    final_text_parts: list[str] = []
+    final_text_parts: list = []
 
-    with client.beta.sessions.events.stream(session.id) as stream:
-        client.beta.sessions.events.send(
-            session.id,
-            events=[
-                {
-                    "type": "user.message",
-                    "content": [{"type": "text", "text": user_message}],
-                }
-            ],
-        )
-        for event in stream:
-            t = event.type
-            if t == "session.thread_created":
-                print(f"  [thread spawned]   {event.agent_name}", flush=True)
-            elif t == "session.thread_status_running":
-                name = getattr(event, "agent_name", "?")
-                print(f"  [thread running]   {name}", flush=True)
-            elif t == "agent.thread_message_received":
-                print(f"  [reply ←]          {event.from_agent_name}", flush=True)
-            elif t == "agent.thread_message_sent":
-                print(f"  [delegate →]       {event.to_agent_name}", flush=True)
-            elif t == "agent.message":
-                for block in event.content:
-                    if getattr(block, "type", None) == "text":
-                        final_text_parts.append(block.text)
-                        print(block.text, end="", flush=True)
-            elif t == "agent.tool_use":
-                print(f"\n  [tool: {getattr(event, 'name', '?')}]", flush=True)
-            elif t == "session.status_idle":
-                print("\n\n[swarm finished]")
-                break
+    def on_event(event):
+        t = event.type
+        if t == "session.thread_created":
+            print(f"  [thread spawned]   {event.agent_name}", flush=True)
+        elif t == "session.thread_status_running":
+            print(f"  [thread running]   {getattr(event, 'agent_name', '?')}", flush=True)
+        elif t == "agent.thread_message_received":
+            print(f"  [reply ←]          {event.from_agent_name}", flush=True)
+        elif t == "agent.thread_message_sent":
+            print(f"  [delegate →]       {event.to_agent_name}", flush=True)
+        elif t == "agent.message":
+            for block in event.content:
+                if getattr(block, "type", None) == "text":
+                    final_text_parts.append(block.text)
+                    print(block.text, end="", flush=True)
+        elif t == "agent.tool_use":
+            print(f"\n  [tool: {getattr(event, 'name', '?')}]", flush=True)
+
+    drive_session(
+        client,
+        session,
+        kickoff_events=[
+            {
+                "type": "user.message",
+                "content": [{"type": "text", "text": user_message}],
+            }
+        ],
+        on_event=on_event,
+        timeout_s=600,
+    )
+    print("\n\n[swarm finished]")
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     transcript_path = OUTPUT_DIR / "coordinator-transcript.txt"
@@ -147,9 +142,9 @@ def main() -> None:
     else:
         print(f"\nDownloaded {file_count} file(s) to {OUTPUT_DIR}/")
 
+    from _common import console_url
     print(f"\nView the full session (including all sub-agent threads) at:")
-    print(f"  https://platform.claude.com/workspaces/default/sessions/{session.id}")
-    print(f"  (swap 'default' for your workspace ID if your key lives elsewhere)")
+    print(f"  {console_url(session.id)}")
 
 
 if __name__ == "__main__":
