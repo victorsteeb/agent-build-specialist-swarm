@@ -1,2 +1,4 @@
-anthropic>=0.40.0
+# Managed Agents (memory stores, multi-agent, skills) needs a current SDK —
+# older installs satisfy a low floor but lack client.beta.* surfaces.
+anthropic>=0.116.0
 python-dotenv>=1.0.0

@@ -25,15 +25,26 @@ def main() -> None:
         return
 
     client = Anthropic()
-    environment = client.beta.environments.create(
-        name="specialist-swarm-env",
-        config={
-            "type": "cloud",
-            "networking": {"type": "unrestricted"},
-        },
+
+    # Environment names are unique per workspace — a second create with the
+    # same name returns 409. On a shared team workspace (or after deleting
+    # .environment_id), reuse the existing environment instead of erroring.
+    env_name = "specialist-swarm-env"
+    environment = next(
+        (e for e in client.beta.environments.list() if e.name == env_name), None
     )
+    if environment is not None:
+        print(f"Reusing existing environment '{env_name}': {environment.id}")
+    else:
+        environment = client.beta.environments.create(
+            name=env_name,
+            config={
+                "type": "cloud",
+                "networking": {"type": "unrestricted"},
+            },
+        )
+        print(f"Environment created: {environment.id}")
     env_path.write_text(environment.id)
-    print(f"Environment created: {environment.id}")
 
 
 if __name__ == "__main__":

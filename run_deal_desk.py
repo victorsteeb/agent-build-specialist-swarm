@@ -12,6 +12,7 @@ Usage:
 """
 
 import os
+import time
 from pathlib import Path
 
 from anthropic import Anthropic
@@ -42,8 +43,9 @@ def main() -> None:
 
     if not Path(".coordinator_id").exists() or not Path(".environment_id").exists():
         raise SystemExit(
-            "Missing .coordinator_id or .environment_id. Run "
-            "create_specialists.py, upload_skills.py, then create_coordinator.py first."
+            "Missing .coordinator_id or .environment_id. Run, in order: "
+            "setup_environment.py, create_specialists.py, upload_skills.py, "
+            "create_coordinator.py."
         )
 
     coordinator_id = Path(".coordinator_id").read_text().strip()
@@ -68,8 +70,9 @@ def main() -> None:
         "2. Delegate to all four specialists in parallel.\n"
         "3. Synthesise their replies.\n"
         "4. Produce the final proposal response as a branded Word document "
-        "if you have access to a docx skill; otherwise output the response "
-        "as a structured markdown document.\n\n"
+        "using your docx skill, and save it to "
+        "/mnt/session/outputs/proposal-response.docx — files saved anywhere "
+        "else cannot be retrieved after the session.\n\n"
         "Specialists have their own skills attached for their respective "
         "domains. Move fast — the RFP deadline is real.\n\n"
         f"{context}"
@@ -116,27 +119,37 @@ def main() -> None:
     transcript_path.write_text("".join(final_text_parts))
     print(f"\nCoordinator transcript saved to {transcript_path}")
 
-    # Pull every file the agents produced in the container
+    # Pull every file the agents produced in the container.
+    # Outputs land in /mnt/session/outputs/ and take a few seconds to index
+    # after the session goes idle — retry a few times before giving up.
     print("\nDownloading deliverables from the session container...")
-    files = client.beta.files.list(
-        scope_id=session.id,
-        betas=["managed-agents-2026-04-01"],
-    )
     file_count = 0
-    for f in files.data:
-        out_path = OUTPUT_DIR / f.filename
-        print(f"  {f.filename}  ->  {out_path}")
-        content = client.beta.files.download(f.id)
-        content.write_to_file(str(out_path))
-        file_count += 1
+    for attempt in range(4):
+        if attempt:
+            time.sleep(3)
+        file_count = 0
+        for f in client.beta.files.list(
+            scope_id=session.id,
+            betas=["managed-agents-2026-04-01"],
+        ):
+            out_path = OUTPUT_DIR / f.filename
+            print(f"  {f.filename}  ->  {out_path}")
+            content = client.beta.files.download(f.id)
+            content.write_to_file(str(out_path))
+            file_count += 1
+        if file_count:
+            break
+        print("  (nothing indexed yet — retrying...)")
 
     if file_count == 0:
-        print("  (no files found — agents may have produced text-only output)")
+        print("  (no files found — did the coordinator save to /mnt/session/outputs/?)")
+        print("  Re-check later with:  python download_deliverable.py")
     else:
         print(f"\nDownloaded {file_count} file(s) to {OUTPUT_DIR}/")
 
     print(f"\nView the full session (including all sub-agent threads) at:")
-    print(f"  https://platform.claude.com/sessions/{session.id}")
+    print(f"  https://platform.claude.com/workspaces/default/sessions/{session.id}")
+    print(f"  (swap 'default' for your workspace ID if your key lives elsewhere)")
 
 
 if __name__ == "__main__":

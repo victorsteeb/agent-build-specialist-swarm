@@ -75,15 +75,25 @@ def main() -> None:
         print(f"  attaching to specialist `{specialist_key}` ({specialist_id})...")
 
         current = client.beta.agents.retrieve(specialist_id)
-        # Avoid duplicate attachment on re-run
+
+        # Avoid duplicate attachment on re-run. The SDK returns skill entries
+        # as typed objects (dicts only on some versions) — handle both.
+        def _skill_id_of(entry) -> str | None:
+            if isinstance(entry, dict):
+                return entry.get("skill_id")
+            return getattr(entry, "skill_id", None)
+
         already_attached = any(
-            s.get("skill_id") == skill_id for s in (current.skills or [])
+            _skill_id_of(s) == skill_id for s in (current.skills or [])
         )
         if already_attached:
             print(f"  already attached ✓ (skipping)")
             continue
 
-        new_skills = list(current.skills or []) + [
+        def _as_param(entry) -> dict:
+            return entry if isinstance(entry, dict) else entry.model_dump(exclude_none=True)
+
+        new_skills = [_as_param(s) for s in (current.skills or [])] + [
             {"type": "custom", "skill_id": skill_id, "version": "latest"}
         ]
         client.beta.agents.update(
@@ -95,7 +105,9 @@ def main() -> None:
 
     Path(".skill_ids.json").write_text(json.dumps(uploaded, indent=2))
     print(f"\nUploaded {len(uploaded)} skills and attached them to specialists.")
-    print("Next: python run_deal_desk.py")
+    print("Next: python create_coordinator.py")
+    print("(order matters: the coordinator pins specialist versions at create time,")
+    print(" so skills must be attached BEFORE the coordinator exists)")
 
 
 if __name__ == "__main__":

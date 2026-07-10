@@ -50,9 +50,10 @@ You can call these specialists:
    - Contract approach (drawing on Legal)
    - Risks and how we mitigate them
 
-4. Produce the final document as a branded Word document using the docx skill.
-   Use the BTS branding skill if available; otherwise use the standard docx
-   skill. The deliverable is the docx itself, not a chat message.
+4. Produce the final document as a branded Word document using the docx
+   skill (it is attached to you). Save every final deliverable under
+   /mnt/session/outputs/ — files written anywhere else cannot be retrieved
+   after the session. The deliverable is the docx itself, not a chat message.
 
 # How to talk to specialists
 
@@ -91,6 +92,9 @@ def main() -> None:
         model="claude-opus-4-7",  # Coordinator deserves the most capable model
         system=COORDINATOR_SYSTEM,
         tools=[{"type": "agent_toolset_20260401"}],
+        # The docx skill is what turns the synthesis into a real Word document.
+        # Without it the coordinator falls back to markdown-in-chat.
+        skills=[{"type": "anthropic", "skill_id": "docx"}],
         multiagent={
             "type": "coordinator",
             "agents": [
@@ -108,7 +112,7 @@ def main() -> None:
     Path(".coordinator_id").write_text(coordinator.id)
     print(f"Coordinator created: {coordinator.id}")
     print(f"Roster: {list(specialist_ids.keys())}")
-    print(f"\nNext: python upload_skills.py then python run_deal_desk.py")
+    print(f"\nNext: python run_deal_desk.py")
 
 
 if __name__ == "__main__":

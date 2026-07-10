@@ -35,15 +35,14 @@ def main() -> None:
     client = Anthropic()
 
     print(f"Listing files for session {session_id}...")
-    # `scope_id` filters to files associated with that session
-    files = client.beta.files.list(
-        scope_id=session_id,
-        betas=["managed-agents-2026-04-01"],
-    )
-
+    # `scope_id` filters to files the session wrote to /mnt/session/outputs/.
+    # Iterating the result auto-paginates.
     OUTPUT_DIR.mkdir(exist_ok=True)
     count = 0
-    for f in files.data:
+    for f in client.beta.files.list(
+        scope_id=session_id,
+        betas=["managed-agents-2026-04-01"],
+    ):
         out_path = OUTPUT_DIR / f.filename
         print(f"  downloading {f.filename} ({f.id})")
         content = client.beta.files.download(f.id)
@@ -53,8 +52,9 @@ def main() -> None:
 
     if count == 0:
         print("\nNo files found on that session.")
+        print("(Deliverables must be saved under /mnt/session/outputs/ in the container.)")
         print("Check the session in the Console:")
-        print(f"  https://platform.claude.com/sessions/{session_id}")
+        print(f"  https://platform.claude.com/workspaces/default/sessions/{session_id}")
     else:
         print(f"\nDownloaded {count} file(s) to {OUTPUT_DIR}/")
 
