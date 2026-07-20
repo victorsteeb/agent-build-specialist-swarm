@@ -1,6 +1,6 @@
 ---
 name: technical-fit
-description: BTS-Synthetic Enterprise Data Platform capability map. Use whenever assessing whether the product covers an RFP requirement — covers architecture, ingest, analytics, governance, ML, SLA, compliance, honest weaknesses, and implementation timelines. Trigger on any request to assess technical fit, coverage, capability gaps, or feasibility against customer requirements.
+description: Northwind Enterprise Data Platform capability map. Use whenever assessing whether the product covers an RFP requirement — covers architecture, ingest, analytics, governance, ML, SLA, compliance, honest weaknesses, and implementation timelines. Trigger on any request to assess technical fit, coverage, capability gaps, or feasibility against customer requirements.
 ---
 
 # Technical Fit — Capability Map

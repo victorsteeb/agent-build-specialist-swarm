@@ -1,6 +1,6 @@
 ---
 name: competitive-intel
-description: BTS-Synthetic competitive battlecards for the Enterprise Data Platform space. Use whenever assessing who else is likely competing for an RFP and how to position against them. Covers Databricks, Snowflake, Microsoft Fabric, and Google BigQuery as the four most common competitors we see in enterprise deals.
+description: Northwind competitive battlecards for the Enterprise Data Platform space. Use whenever assessing who else is likely competing for an RFP and how to position against them. Covers Databricks, Snowflake, Microsoft Fabric, and Google BigQuery as the four most common competitors we see in enterprise deals.
 ---
 
 # Competitive Intelligence

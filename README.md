@@ -1,4 +1,4 @@
-# Track 3 — Specialist Swarm
+# Track 2 — Specialist Swarm
 
 You build a **coordinator agent** that fans an inbound RFP out to four **specialist sub-agents** — each carrying its own **skill** — and synthesises their work into a real branded Word document. It's the coordinator-plus-specialists shape every services firm runs on, made concrete: drop an RFP in, watch four specialists answer in parallel on the events stream, get `proposal-response.docx` out.
 

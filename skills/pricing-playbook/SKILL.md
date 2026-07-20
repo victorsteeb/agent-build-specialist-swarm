@@ -1,6 +1,6 @@
 ---
 name: pricing-playbook
-description: BTS-Synthetic Deal Desk pricing rules. Use whenever recommending commercial terms for an inbound RFP — covers discount bands, payment terms, term length, and concessions we will and will not make. Trigger on any request to propose pricing, discount, deal structure, or commercial position.
+description: Northwind Deal Desk pricing rules. Use whenever recommending commercial terms for an inbound RFP — covers discount bands, payment terms, term length, and concessions we will and will not make. Trigger on any request to propose pricing, discount, deal structure, or commercial position.
 ---
 
 # Pricing Playbook

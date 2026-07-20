@@ -1,4 +1,4 @@
-# Track 3 — Specialist Swarm (build brief)
+# Track 2 — Specialist Swarm (build brief)
 
 **Concept landed:** Skills, sub-agents & orchestration
 **Tech:** [Claude Managed Agents multi-agent](https://platform.claude.com/docs/en/managed-agents/multi-agent) + [custom Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) + the pre-built [docx skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/quickstart)

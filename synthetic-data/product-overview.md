@@ -1,4 +1,4 @@
-# BTS-Synthetic Enterprise Data Platform — Capability Map
+# Northwind Enterprise Data Platform — Capability Map
 
 Authoritative capability list for the Technical Fit Specialist. Use this to answer "do we cover this requirement?"
 

@@ -1,7 +1,7 @@
 # Request for Proposal — Acme Corp Enterprise Data Platform
 
 **From:** Acme Corp, Procurement Office (procurement@acme-synthetic.example)
-**To:** Vendor — BTS-Synthetic
+**To:** Vendor — Northwind
 **Issued:** 2026-05-12
 **Response due:** 2026-05-26 (14 days)
 **Award expected:** 2026-06-30
