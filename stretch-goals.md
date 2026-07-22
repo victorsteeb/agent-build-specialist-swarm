@@ -38,6 +38,17 @@ This is the visible parallelism story.
 
 **Why this lands:** This is the visual that lands the architecture pitch. "Four specialists, parallel, one synthesis."
 
+### S12. Let the coordinator choose its own roster (parallelization → orchestrator-workers)
+The core build ships a **fixed roster**: the same four specialists fire on every RFP. In Anthropic's [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents) vocabulary that's **parallelization (sectioning)** — the subtasks are predetermined. This stretch turns it into true **orchestrator-workers**: the coordinator reads the RFP *first* and decides, at runtime, which specialists to invoke and/or writes a tailored sub-brief for each one, instead of blindly firing all four.
+
+Two ways to build it, easy → hard:
+1. **Tailored sub-briefs.** Keep all four specialists, but change the coordinator prompt so it derives a *specific* ask per specialist from the RFP ("this RFP has an MFN clause and uncapped liability — Legal, focus there") rather than sending the same generic brief.
+2. **Dynamic selection.** Add a first coordinator step: "read the RFP, then list which of your specialists this deal actually needs and why." Only delegate to those. A pure-infrastructure RFP with no competitive angle might skip Competitive Intel; a data-only RFP might not need Legal in depth.
+
+**Read this before you pick it — the tradeoff is the point.** A fixed roster is *deterministic*: every run invokes the same four, phrasing is stable, and the demo is the same every time. The moment the coordinator decides the roster at runtime you **reintroduce nondeterminism on purpose** — some runs invoke three specialists, some four; the sub-briefs vary; two runs of the same RFP can differ. That's exactly the fragility the fixed roster exists to avoid, and it's most likely to bite *right before a live defense*. Build this only once your fixed-roster demo is locked and green on `check_deliverable.py` — never as your primary path into Drive Value.
+
+**Why this lands:** it's the difference between two patterns clients will ask you to name. You can say, precisely: "we shipped parallelization for reliability, and here's the orchestrator-workers version and exactly what it costs you in predictability." That's a 400-level answer.
+
 ---
 
 ## Tier 3 — Wire the system to the real world
@@ -109,3 +120,4 @@ Watch the `span.outcome_evaluation_*` events flow past on the stream — that's 
 | Best for selling to your firm internally | S1 (your firm's voice as a Skill) |
 | Best architecture demo for client CIO | S5 (synthetic CRM MCP) |
 | Best "next quarter we should build this" outcome | S6 + S7 (Slack + pptx output) |
+| Best pattern-vocabulary flex (name what you built) | S12 (fixed roster → orchestrator-workers) |

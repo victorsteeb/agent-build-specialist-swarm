@@ -53,6 +53,7 @@ agent-build-specialist-swarm/
 ├── upload_skills.py                (step 3 — Skills API upload + attach, idempotent)
 ├── create_coordinator.py           (step 4 — Senior Partner + roster + docx skill; re-run to re-pin)
 ├── run_deal_desk.py                (step 5 — run the swarm, stream events, download outputs)
+├── check_deliverable.py            (step 6 — required verifier: grades the docx, no API call)
 ├── download_deliverable.py         (re-fetch outputs from any past session)
 ├── stretch_critic_subagent.py      (stretch: a critic agent that reviews the draft)
 ├── skills/                         (custom skills — one per specialist)
