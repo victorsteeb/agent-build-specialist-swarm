@@ -95,7 +95,7 @@ Two-monitor setup:
 
 Every session prints its ID and a Console trace URL when it starts — drop that on screen too if you want to show the full sub-agent threads.
 
-## Take-home — what you show your practice lead
+## What you walk out with
 
 Two artifacts:
 1. **`outputs/proposal-response.docx`** — the document the swarm wrote from an RFP it had never seen, with each section owned by a different specialist and its own playbook.
