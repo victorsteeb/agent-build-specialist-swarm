@@ -141,6 +141,8 @@ def main() -> None:
         print("  Re-check later with:  python download_deliverable.py")
     else:
         print(f"\nDownloaded {file_count} file(s) to {OUTPUT_DIR}/")
+        print("\nNext: grade it —  python check_deliverable.py")
+        print("  (checks the docx against the Great-when bar; no API call, ~2s)")
 
     from _common import console_url
     print(f"\nView the full session (including all sub-agent threads) at:")
