@@ -109,6 +109,23 @@ def check_criterion(text, text_lc, c):
     return ok, None
 
 
+def _staleness_warning(output_path):
+    """If .last_session_id (stamped when run_deal_desk starts a session) is newer
+    than the deliverable, the most recent run didn't produce this docx — it likely
+    errored before the download. Grading a leftover from an earlier run reports a
+    misleading PASS, so flag it."""
+    marker = Path(".last_session_id")
+    try:
+        if marker.exists() and output_path.exists():
+            if marker.stat().st_mtime > output_path.stat().st_mtime + 2:
+                return (f"⚠ STALE: {output_path} is older than your last session — "
+                        "the latest run may have errored before downloading it. "
+                        "Re-run run_deal_desk.py to grade THIS session.")
+    except OSError:
+        pass
+    return None
+
+
 def is_wired_scenario() -> bool:
     """True only if the shipped Acme RFP is still the input — i.e. you haven't
     swapped synthetic-data/ for your own scenario."""
@@ -140,9 +157,12 @@ def main() -> None:
             "  /mnt/session/outputs/. Open the Console trace from the run and check."
         )
 
+    stale = _staleness_warning(path)
     print(f"Checking {path}  ({len(text.strip())} chars, {len(nonblank)} lines)\n")
     print("FLOOR — is there a real, assembled deliverable?")
     print("  ✓ Exists, has content, and assembled a structured document")
+    if stale:
+        print(f"  {stale}")
     print()
 
     gate_failures = 0
@@ -224,6 +244,8 @@ def main() -> None:
             "re-run create_coordinator.py → run_deal_desk.py → check_deliverable.py."
         )
     print("✓ PASSED — a real deliverable, and it meets the bar in play.")
+    if stale:
+        print("  ⚠ ...but you graded a STALE file — re-run run_deal_desk.py to grade THIS session.")
     if criteria is None and is_wired_scenario():
         print("  (Read the advisory WIRED GRADE above for what to tighten before Drive Value.)")
 

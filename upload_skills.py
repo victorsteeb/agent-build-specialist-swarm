@@ -54,6 +54,17 @@ def main() -> None:
     for item in client.beta.skills.list(source="custom"):
         existing_by_title[item.display_title] = item.id
 
+    # Skill IDs from a prior run. Reusing the EXACT id keeps a re-run from minting
+    # a second skill that mounts at the same name — the cause of the
+    # "two skills cannot share the same name" session error.
+    saved_ids: dict = {}
+    saved_path = Path(".skill_ids.json")
+    if saved_path.exists():
+        try:
+            saved_ids = json.loads(saved_path.read_text())
+        except (ValueError, OSError):
+            saved_ids = {}
+
     uploaded: dict[str, str] = {}
 
     for skill_name, specialist_key in SKILL_TO_SPECIALIST.items():
@@ -64,12 +75,22 @@ def main() -> None:
 
         display_title = f"{skill_name.replace('-', ' ').title()} {suffix}"
 
-        # 1. Upload the skill (or reuse if one already exists with this title)
-        if display_title in existing_by_title:
+        # 1. Resolve the skill id: reuse the saved one if it still exists, else a
+        #    same-title one, else create. (Reuse-by-id, not just title, so a title
+        #    lookup miss on stale state can't spawn a duplicate mount-name.)
+        skill_id = None
+        saved = saved_ids.get(skill_name)
+        if saved:
+            try:
+                client.beta.skills.retrieve(saved)
+                skill_id = saved
+                print(f"Reusing skill (saved id): {skill_name} ({skill_id})")
+            except Exception:
+                skill_id = None
+        if skill_id is None and display_title in existing_by_title:
             skill_id = existing_by_title[display_title]
-            print(f"Reusing existing skill: {skill_name} ({skill_id})")
-            uploaded[skill_name] = skill_id
-        else:
+            print(f"Reusing skill (by title): {skill_name} ({skill_id})")
+        if skill_id is None:
             print(f"Uploading skill: {skill_name}...")
             try:
                 skill = client.beta.skills.create(
@@ -88,42 +109,36 @@ def main() -> None:
                     display_title=display_title,
                     files=files_from_dir(str(skill_dir)),
                 )
-            uploaded[skill_name] = skill.id
-            print(f"  -> {skill.id}")
+            skill_id = skill.id
+            print(f"  -> {skill_id}")
+        uploaded[skill_name] = skill_id
 
-        # 2. Attach to the matching specialist by updating its skills array
+        # 2. Attach to the matching specialist. Each specialist owns EXACTLY ONE
+        #    skill (the 1:1 architecture rule), so SET its skills to just this one
+        #    rather than appending. Appending a second skill that mounts at the
+        #    same name — which happens on a re-run or from stale state — is what
+        #    triggers the "two skills cannot share the same name" session error.
         specialist_id = specialist_ids[specialist_key]
-        skill_id = uploaded[skill_name]
         print(f"  attaching to specialist `{specialist_key}` ({specialist_id})...")
 
         current = client.beta.agents.retrieve(specialist_id)
 
-        # Avoid duplicate attachment on re-run. The SDK returns skill entries
-        # as typed objects (dicts only on some versions) — handle both.
         def _skill_id_of(entry):
             if isinstance(entry, dict):
                 return entry.get("skill_id")
             return getattr(entry, "skill_id", None)
 
-        already_attached = any(
-            _skill_id_of(s) == skill_id for s in (current.skills or [])
-        )
-        if already_attached:
-            print(f"  already attached ✓ (skipping)")
+        current_ids = [_skill_id_of(s) for s in (current.skills or [])]
+        if current_ids == [skill_id]:
+            print(f"  already the only attached skill ✓ (skipping)")
             continue
 
-        def _as_param(entry) -> dict:
-            return entry if isinstance(entry, dict) else entry.model_dump(exclude_none=True)
-
-        new_skills = [_as_param(s) for s in (current.skills or [])] + [
-            {"type": "custom", "skill_id": skill_id, "version": "latest"}
-        ]
         client.beta.agents.update(
             specialist_id,
             version=current.version,
-            skills=new_skills,
+            skills=[{"type": "custom", "skill_id": skill_id, "version": "latest"}],
         )
-        print(f"  attached ✓")
+        print(f"  attached ✓ (specialist skills set to just [{skill_name}])")
 
     Path(".skill_ids.json").write_text(json.dumps(uploaded, indent=2))
     print(f"\nUploaded {len(uploaded)} skills and attached them to specialists.")
