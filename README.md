@@ -2,7 +2,7 @@
 
 You build a **coordinator agent** that fans an inbound RFP out to four **specialist sub-agents** — each carrying its own **skill** — and synthesises their work into a real branded Word document. It's the coordinator-plus-specialists shape every services firm runs on, made concrete: drop an RFP in, watch four specialists answer in parallel on the events stream, get `proposal-response.docx` out.
 
-**Start with [`BRIEF.md`](./BRIEF.md)** — the scenario, the numbered build, the 40-minute plan, and the demo.
+**Start with [`BRIEF.md`](./BRIEF.md)** — the scenario, the numbered build, the phased plan, and the demo.
 
 ## Step 0 — run this first
 

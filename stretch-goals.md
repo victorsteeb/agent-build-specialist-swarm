@@ -114,7 +114,7 @@ Watch the `span.outcome_evaluation_*` events flow past on the stream — that's 
 
 ## Picking guidance
 
-| If your team has 20 minutes | Pick |
+| Goal | Pick |
 | --- | --- |
 | Best visual demo punchline | S2 (Critic) or S4 (explicit parallelism) |
 | Best for selling to your firm internally | S1 (your firm's voice as a Skill) |
