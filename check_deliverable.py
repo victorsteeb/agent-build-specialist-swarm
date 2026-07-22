@@ -84,7 +84,7 @@ def load_criteria():
     if not ACCEPTANCE.exists():
         return None
     crits = []
-    for raw in ACCEPTANCE.read_text().splitlines():
+    for raw in ACCEPTANCE.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue

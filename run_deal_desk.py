@@ -111,7 +111,7 @@ def main() -> None:
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     transcript_path = OUTPUT_DIR / "coordinator-transcript.txt"
-    transcript_path.write_text("".join(final_text_parts))
+    transcript_path.write_text("".join(final_text_parts), encoding="utf-8")
     print(f"\nCoordinator transcript saved to {transcript_path}")
 
     # Pull every file the agents produced in the container.

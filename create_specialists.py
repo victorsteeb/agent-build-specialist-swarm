@@ -116,9 +116,20 @@ def main() -> None:
         existing = saved.get(spec["key"])
         if existing:
             try:
-                client.beta.agents.retrieve(existing)
+                current = client.beta.agents.retrieve(existing)
+                # Update in place so an edited prompt/model actually applies on
+                # re-run. `skills` is omitted -> preserved (PATCH semantics), so
+                # the skill attached by upload_skills.py stays put. Re-run
+                # create_coordinator.py afterwards to re-pin the roster.
+                client.beta.agents.update(
+                    existing,
+                    version=current.version,
+                    model=spec["model"],
+                    system=spec["system"],
+                    tools=[{"type": "agent_toolset_20260401"}],
+                )
                 specialist_ids[spec["key"]] = existing
-                print(f"  Reusing {spec['name']:32s} -> {existing}")
+                print(f"  Updated {spec['name']:32s} -> {existing}")
                 continue
             except anthropic.APIStatusError:
                 print(f"  Saved ID for {spec['key']} is unreachable — creating a fresh one.")

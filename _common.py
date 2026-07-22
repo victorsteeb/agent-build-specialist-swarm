@@ -8,10 +8,21 @@ wrong, you get a next step instead of a traceback.
 
 import os
 import pathlib
+import sys
 import time
 
 import anthropic
 from anthropic import Anthropic
+
+# Windows consoles default to cp1252; streamed agent output routinely contains
+# characters outside it (→, ✓, box-drawing), which crashes the run mid-stream on
+# a plain print(). Force UTF-8 for every script that imports this module. (File
+# writes pass encoding="utf-8" explicitly — this only covers stdout/stderr.)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 
 _ENV_TEMPLATE = (
