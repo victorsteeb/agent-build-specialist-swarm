@@ -38,6 +38,16 @@ import sys
 import zipfile
 from pathlib import Path
 
+# Windows consoles default to cp1252; the ✓ / ✗ output below crashes on a plain
+# print when stdout isn't UTF-8 (a legacy console, or stdout redirected to a
+# file). This grader stays dependency-light and doesn't import _common, so it
+# carries its own copy of the UTF-8 guard.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 DELIVERABLE = Path("outputs/proposal-response.docx")
 ACCEPTANCE = Path("acceptance.txt")
 WIRED_RFP = Path("synthetic-data/rfp-acme-corp.md")

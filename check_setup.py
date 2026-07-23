@@ -16,6 +16,16 @@ Usage:
 # ── 1. Dependencies — safe to re-run; survives PEP 668 / no-admin Pythons ──
 import importlib.util, subprocess, sys
 
+# Windows consoles default to cp1252; the ✓ / … output below crashes on a plain
+# print when stdout isn't UTF-8 — a legacy console, or (commonly) stdout
+# redirected to a file. This script runs BEFORE _common is importable (it may
+# install the SDK first), so it carries its own copy of the UTF-8 guard.
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
+
 
 def _ensure_packages(requirements):
     """requirements: list of (import_name, pip_spec). Install only what is missing,
