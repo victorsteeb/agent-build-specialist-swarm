@@ -8,10 +8,21 @@ wrong, you get a next step instead of a traceback.
 
 import os
 import pathlib
+import sys
 import time
 
 import anthropic
 from anthropic import Anthropic
+
+# Windows consoles default to cp1252; streamed agent output routinely contains
+# characters outside it (→, ✓, box-drawing), which crashes the run mid-stream on
+# a plain print(). Force UTF-8 for every script that imports this module. (File
+# writes pass encoding="utf-8" explicitly — this only covers stdout/stderr.)
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except (AttributeError, ValueError):
+    pass
 
 
 _ENV_TEMPLATE = (
@@ -116,6 +127,22 @@ def _error_text(event):
     return getattr(err, "message", None) or str(err)
 
 
+def _print_run_stats(client, session, elapsed_s):
+    """Wall-clock + token readout so a team can see the number their lens moves
+    (cost = tokens, speed = seconds). Best-effort: a stats hiccup never breaks
+    the run. Shows the score; it does not compute a verdict (that is the
+    participant's call to argue)."""
+    parts = [f"{elapsed_s:.0f}s ({elapsed_s / 60:.1f} min)"]
+    try:
+        u = client.beta.sessions.retrieve(session.id).usage
+        inp, out = u.input_tokens or 0, u.output_tokens or 0
+        cache = u.cache_read_input_tokens or 0
+        parts.append(f"{inp + out:,} tokens (in {inp:,} / out {out:,}; {cache:,} cache-read)")
+    except Exception:
+        parts.append("token usage unavailable - see the Console trace")
+    print(f"\n[run stats] {' | '.join(parts)}", flush=True)
+
+
 def drive_session(client, session, kickoff_events, on_event, timeout_s=600):
     """Run one turn of a session, correctly.
 
@@ -132,7 +159,8 @@ def drive_session(client, session, kickoff_events, on_event, timeout_s=600):
     print(f"Session: {session.id}")
     print(f"Watch it live: {url}\n")
 
-    reminder_at = time.monotonic() + timeout_s
+    t0 = time.monotonic()
+    reminder_at = t0 + timeout_s
     with client.beta.sessions.events.stream(session.id) as stream:
         client.beta.sessions.events.send(session.id, events=kickoff_events)
         for event in stream:
@@ -150,6 +178,7 @@ def drive_session(client, session, kickoff_events, on_event, timeout_s=600):
                 stop = getattr(event, "stop_reason", None)
                 if getattr(stop, "type", None) == "requires_action":
                     continue  # transient idle — the agent is waiting, keep listening
+                _print_run_stats(client, session, time.monotonic() - t0)
                 return  # normal completion
             if time.monotonic() > reminder_at:
                 print(

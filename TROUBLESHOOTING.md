@@ -31,7 +31,7 @@ Once you see `✓ API key verified — any error after this is not the API key`,
 1. Run `setup_environment.py`, `create_specialists.py`, `upload_skills.py` as normal — none of them need the preview.
 2. **Skip** `create_coordinator.py`.
 3. For each of the four specialists, create a single-agent session (`agent=<that specialist's id>` from `.specialist_ids.json`), send it the RFP text, and save its reply. Each specialist already has its skill attached, so it answers in-lane.
-4. Create one more single-agent session against any capable agent, paste in the RFP plus the four saved replies, and ask it to synthesise them and write `proposal-response.docx` to `/mnt/session/outputs/` using the docx skill.
+4. Create one **new synthesis agent with the docx skill attached** — `client.beta.agents.create(name="Deal Desk Synthesis", model="claude-opus-4-8", tools=[{"type": "agent_toolset_20260401"}], skills=[{"type": "anthropic", "skill_id": "docx"}])` — then start a single-agent session against it, paste in the RFP plus the four saved replies, and ask it to synthesise them and write `proposal-response.docx` to `/mnt/session/outputs/`. **The four specialists only carry their own domain skill, not docx** (only `create_coordinator.py` attaches docx, and this fallback skips it) — so docx must be attached to whichever agent writes the document, or you'll get markdown in chat instead of a file.
 5. `python download_deliverable.py <that session id>` to pull the docx.
 
 Same coordinator-plus-specialists shape — just sequential instead of parallel.

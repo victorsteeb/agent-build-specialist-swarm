@@ -76,10 +76,14 @@ def main() -> None:
     # Stream the events — this is the demo. Watch for parallel thread spawns.
     print("\n=== EVENT STREAM (this is the demo) ===\n")
     final_text_parts: list = []
+    thread_names: dict = {}  # session_thread_id -> specialist name, for attribution
 
     def on_event(event):
         t = event.type
         if t == "session.thread_created":
+            tid = getattr(event, "session_thread_id", None)
+            if tid:
+                thread_names[tid] = event.agent_name
             print(f"  [thread spawned]   {event.agent_name}", flush=True)
         elif t == "session.thread_status_running":
             print(f"  [thread running]   {getattr(event, 'agent_name', '?')}", flush=True)
@@ -93,7 +97,16 @@ def main() -> None:
                     final_text_parts.append(block.text)
                     print(block.text, end="", flush=True)
         elif t == "agent.tool_use":
-            print(f"\n  [tool: {getattr(event, 'name', '?')}]", flush=True)
+            # Attribute each tool call to the specialist that fired it (the
+            # session-level stream carries tool_use for every thread). Falls
+            # back to "coordinator" for the primary thread's own calls.
+            who = thread_names.get(getattr(event, "session_thread_id", None), "coordinator")
+            name = getattr(event, "name", "?")
+            inp = getattr(event, "input", {}) or {}
+            target = str(inp.get("path") or inp.get("file_path") or inp.get("command") or "")
+            print(f"\n  [{who}: {name}]", flush=True)
+            if "proposal-response.docx" in target or (name in ("write", "edit") and ".docx" in target):
+                print("  ===> writing the branded deliverable (proposal-response.docx)", flush=True)
 
     drive_session(
         client,
@@ -111,7 +124,7 @@ def main() -> None:
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     transcript_path = OUTPUT_DIR / "coordinator-transcript.txt"
-    transcript_path.write_text("".join(final_text_parts))
+    transcript_path.write_text("".join(final_text_parts), encoding="utf-8")
     print(f"\nCoordinator transcript saved to {transcript_path}")
 
     # Pull every file the agents produced in the container.
